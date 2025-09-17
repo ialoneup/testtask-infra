@@ -8,13 +8,13 @@
 
 ---
 
-# Install Ansible reqs
+**Install Ansible reqs**
 ansible-galaxy collection install -r requirements.yml
 
-# Could run locally
+**Could run locally**
 ansible-playbook infra_init.yml
 
-# Or remotely
+**Or remotely**
 ansible-playbook infra_init.yml -e "target_host=1.2.3.4 target_user=ubuntu"
 
 ---
