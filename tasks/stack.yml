@@ -1,0 +1,30 @@
+- name: Ensure project root exists
+  file:
+    path: "{{ project_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Sync project tree to host
+  ansible.posix.synchronize:
+    src: "{{ project_src }}/"
+    dest: "{{ project_root }}/"
+    delete: no
+    recursive: yes
+    rsync_opts:
+      - "--chown=root:root"
+
+- name: Deploy with docker compose v2
+  community.docker.docker_compose_v2:
+    project_src: "{{ project_root }}"
+    files: "{{ compose_files }}"
+    pull: always
+    remove_orphans: true
+    recreate: auto
+    state: present
+  register: compose_result
+
+- name: Show compose changes
+  debug:
+    var: compose_result

@@ -1,0 +1,112 @@
+{
+  "id": null,
+  "uid": "nginx-proxy",
+  "title": "NGINX Exporter - Proxy",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "15s",
+  "tags": ["nginx", "prometheus", "stub_status"],
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      { "type": "datasource", "name": "DS_PROMETHEUS", "label": "Datasource", "query": "prometheus" },
+      {
+        "type": "query",
+        "name": "job",
+        "label": "Job",
+        "datasource": "$DS_PROMETHEUS",
+        "refresh": 1,
+        "query": "label_values(nginx_up, job)"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active connections (total)",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 4 },
+      "datasource": "$DS_PROMETHEUS",
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(nginx_connections_active{job=\"$job\"})", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests per second (per instance)",
+      "gridPos": { "x": 8, "y": 0, "w": 16, "h": 8 },
+      "datasource": "$DS_PROMETHEUS",
+      "fieldConfig": { "defaults": { "unit": "req/s" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(nginx_http_requests_total{job=\"$job\"}[5m]))",
+          "legendFormat": "{{instance}} req/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Active connections (per instance)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": "$DS_PROMETHEUS",
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "nginx_connections_active{job=\"$job\"}",
+          "legendFormat": "{{instance}} active",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Connections by state (total)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": "$DS_PROMETHEUS",
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        { "expr": "sum(nginx_connections_reading{job=\"$job\"})", "legendFormat": "reading", "refId": "A" },
+        { "expr": "sum(nginx_connections_writing{job=\"$job\"})", "legendFormat": "writing", "refId": "B" },
+        { "expr": "sum(nginx_connections_waiting{job=\"$job\"})", "legendFormat": "waiting", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Accepted / handled connections (rate, total)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": "$DS_PROMETHEUS",
+      "fieldConfig": { "defaults": { "unit": "conn/s" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(nginx_connections_accepted{job=\"$job\"}[5m]))", "legendFormat": "accepted/s", "refId": "A" },
+        { "expr": "sum(rate(nginx_connections_handled{job=\"$job\"}[5m]))", "legendFormat": "handled/s", "refId": "B" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Handled / Accepted (%)",
+      "gridPos": { "x": 12, "y": 12, "w": 6, "h": 4 },
+      "datasource": "$DS_PROMETHEUS",
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "100 * ( sum(rate(nginx_connections_handled{job=\"$job\"}[5m])) / clamp_min(sum(rate(nginx_connections_accepted{job=\"$job\"}[5m])), 1) )",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Requests / Connection (last 5m, total)",
+      "gridPos": { "x": 18, "y": 12, "w": 6, "h": 4 },
+      "datasource": "$DS_PROMETHEUS",
+      "targets": [
+        {
+          "expr": "sum(increase(nginx_http_requests_total{job=\"$job\"}[5m])) / clamp_min(sum(increase(nginx_connections_accepted{job=\"$job\"}[5m])), 1)",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

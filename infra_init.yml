@@ -1,0 +1,20 @@
+- name: Provision infra host
+  hosts: testtask-infra
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Show connection info
+      debug:
+        msg: "Connecting to {{ ansible_host }} via {{ ansible_connection }} as {{ ansible_user }}"
+
+    - name: Ensure rsync is installed (for ansible.posix.synchronize)
+      package:
+        name: rsync
+        state: present
+
+  tasks:
+    - import_tasks: tasks/docker.yml
+      tags: [docker]
+    - import_tasks: tasks/stack.yml
+      tags: [stack]

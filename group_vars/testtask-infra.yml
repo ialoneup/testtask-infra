@@ -1,0 +1,10 @@
+project_root: /srv/testtask-infra
+
+project_src: "{{ playbook_dir }}/project"
+
+compose_files:
+  - docker-compose.yml
+
+ansible_host: "{{ target_host | default('localhost') }}"
+ansible_connection: "{{ connection_type | default('local' if ansible_host == 'localhost' else 'ssh') }}"
+ansible_user: "{{ target_user | default(lookup('env','USER')) }}"

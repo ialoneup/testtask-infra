@@ -1,0 +1,260 @@
+services:
+
+# Proxy with share storage
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: proxy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/crdb-stream.conf:/etc/nginx/streams/crdb-stream.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8090"
+      - "26256:26256"
+    restart: unless-stopped
+
+  storage:
+    image: nginx:1.27-alpine
+    container_name: storage
+    volumes:
+      - ./nginx/nginx-storage.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./data/local-storage:/srv/public:ro
+    expose:
+      - "80"
+    depends_on:
+      - proxy
+    restart: unless-stopped
+
+# Monitoring
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - ./data/prometheus:/prometheus
+    user: "0:0"
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    container_name: node_exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+  nginx-proxy-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4
+    container_name: nginx_proxy_exporter
+    command:
+      - --nginx.scrape-uri=https://proxy/stub_status
+      - --web.listen-address=:9101
+      - --no-nginx.ssl-verify
+    ports:
+      - "9101:9101"
+    depends_on:
+      - proxy
+    restart: unless-stopped
+
+  nginx-storage-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4
+    container_name: nginx_storage_exporter
+    command:
+      - --nginx.scrape-uri=http://storage/stub_status
+      - --web.listen-address=:9102
+    ports:
+      - "9102:9102"
+    depends_on:
+      - storage
+    restart: unless-stopped
+
+  # Graphs for monitoring metrics
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "ADMIN"
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./data/grafana:/var/lib/grafana
+    user: "0:0"
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  # Sidecar monitoring app
+  daemon-monitor:
+    build:
+      context: ./monitoring/
+      dockerfile: daemon-monitor/Dockerfile
+    container_name: daemon_monitor
+    environment:
+      PROM_URL: http://prometheus:9090
+      PROM_QUERY: avg(node_load1)
+      NGINX_STUB: https://proxy/stub_status
+      INTERVAL: "15"
+      TIMEOUT: "5"
+      LOG_SIZE: "1000000"
+      LOG_KEEP: "10"
+      CRDB_DSN: postgresql://root@proxy:26256?sslmode=disable&connect_timeout=5
+      CRDB_DB: monitor
+      CRDB_TABLE: heartbeat
+      CRDB_WRITE_TEST: "true"
+    volumes:
+      - ./data/daemon-monitor:/var/log/daemon-monitor
+    expose:
+      - "9200:9200"
+    depends_on:
+      - proxy
+      - prometheus
+      - crdb1
+    restart: unless-stopped
+
+# CockroachDB setup
+  crdb1:
+    image: cockroachdb/cockroach:v25.3.1
+    container_name: crdb1
+    command: >
+      start
+      --insecure
+      --store=path=/cockroach/cockroach-data,size=10GiB
+      --advertise-addr=crdb1:26357
+      --listen-addr=crdb1:26357
+      --sql-addr=crdb1:26257
+      --http-addr=crdb1:8091
+      --join=crdb1:26357,crdb2:26357,crdb3:26357,crdb4:26357,crdb5:26357
+    volumes:
+      - ./data/crdb-data/crdb1:/cockroach/cockroach-data
+    ports:
+      - "26257:26257"
+    expose:
+      - "8091"
+    restart: unless-stopped
+
+  crdb2:
+    image: cockroachdb/cockroach:v25.3.1
+    container_name: crdb2
+    command: >
+      start
+      --insecure
+      --store=path=/cockroach/cockroach-data,size=10GiB
+      --advertise-addr=crdb2:26357
+      --listen-addr=crdb2:26357
+      --sql-addr=crdb2:26258
+      --http-addr=crdb2:8092
+      --join=crdb1:26357,crdb2:26357,crdb3:26357,crdb4:26357,crdb5:26357
+    volumes:
+      - ./data/crdb-data/crdb2:/cockroach/cockroach-data
+    ports:
+      - "26258:26258"
+    expose:
+      - "8092"
+    restart: unless-stopped
+
+  crdb3:
+    image: cockroachdb/cockroach:v25.3.1
+    container_name: crdb3
+    command: >
+      start
+      --insecure
+      --store=path=/cockroach/cockroach-data,size=10GiB
+      --advertise-addr=crdb3:26357
+      --listen-addr=crdb3:26357
+      --sql-addr=crdb3:26259
+      --http-addr=crdb3:8093
+      --join=crdb1:26357,crdb2:26357,crdb3:26357,crdb4:26357,crdb5:26357
+    volumes:
+      - ./data/crdb-data/crdb3:/cockroach/cockroach-data
+    ports:
+      - "26259:26259"
+    expose:
+      - "8093"
+    restart: unless-stopped
+
+  crdb4:
+    image: cockroachdb/cockroach:v25.3.1
+    container_name: crdb4
+    command: >
+      start
+      --insecure
+      --store=path=/cockroach/cockroach-data,size=10GiB
+      --advertise-addr=crdb4:26357
+      --listen-addr=crdb4:26357
+      --sql-addr=crdb4:26260
+      --http-addr=crdb4:8094
+      --join=crdb1:26357,crdb2:26357,crdb3:26357,crdb4:26357,crdb5:26357
+    volumes:
+      - ./data/crdb-data/crdb4:/cockroach/cockroach-data
+    ports:
+      - "26260:26260"
+    expose:
+      - "8094"
+    restart: unless-stopped
+
+  crdb5:
+    image: cockroachdb/cockroach:v25.3.1
+    container_name: crdb5
+    command: >
+      start
+      --insecure
+      --store=path=/cockroach/cockroach-data,size=10GiB
+      --advertise-addr=crdb5:26357
+      --listen-addr=crdb5:26357
+      --sql-addr=crdb5:26261
+      --http-addr=crdb5:8095
+      --join=crdb1:26357,crdb2:26357,crdb3:26357,crdb4:26357,crdb5:26357
+    volumes:
+      - ./data/crdb-data/crdb5:/cockroach/cockroach-data
+    ports:
+      - "26261:26261"
+    expose:
+      - "8095"
+    restart: unless-stopped
+
+  crdb-first-init:
+    image: cockroachdb/cockroach:v25.3.1
+    container_name: crdb-first-init
+    entrypoint: /bin/sh
+    command:
+      - -ec
+      - |
+        echo "Waiting a few seconds for nodes..." && sleep 10
+        /cockroach/cockroach init --host=crdb1:26357 --insecure || true
+        /cockroach/cockroach sql --insecure --host=crdb1:26257 -e "
+          CREATE DATABASE IF NOT EXISTS monitor;
+          CREATE TABLE IF NOT EXISTS monitor.heartbeat (
+            ts TIMESTAMPTZ DEFAULT now(),
+            note STRING,
+            id UUID DEFAULT gen_random_uuid(),
+            PRIMARY KEY (ts, id)
+          );
+          SELECT * FROM monitor.heartbeat;
+         "
+    depends_on:
+      - crdb1
+      - crdb2
+      - crdb3
+      - crdb4
+      - crdb5
+    restart: "no"
+
+# Infra network
+networks:
+  default:
+    name: infra-net

@@ -1,0 +1,9 @@
+groups:
+- name: cockroach
+  rules:
+  - alert: Cockroach-NodeDown
+    expr: up{job="cockroach-nodes"} == 0
+    for: 15s
+    labels: { severity: critical }
+    annotations:
+      summary: "CockroachDB node is down ({{ $labels.instance }})"
