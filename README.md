@@ -1,63 +1,81 @@
 # TestTask Infra Stack (Docker Compose + Ansible)
 
-This repository provisions and deploys a complete infrastructure stack using **Ansible** and **Docker Compose v2**.  
-It includes:
-
 - **NGINX reverse proxy** and static storage
-- **CockroachDB cluster** (5 nodes + init job)
+- **CockroachDB cluster** (5 nodes + first init job)
 - **Monitoring stack**: Prometheus, Alertmanager, Node Exporter, NGINX Exporters
 - **Grafana dashboards**
 - **Custom daemon-monitor sidecar**
 
 ---
 
-## 🔧 Quickstart
-
-```bash
-# Clone repo
-git clone <this-repo-url>
-cd testtask-infra
-
-# Install Ansible collections
+# Install Ansible reqs
 ansible-galaxy collection install -r requirements.yml
 
-# Run locally
+# Could run locally
 ansible-playbook infra_init.yml
 
-# Or run remotely
+# Or remotely
 ansible-playbook infra_init.yml -e "target_host=1.2.3.4 target_user=ubuntu"
-```
 
 ---
 
-## 📡 Services
+## Services and ports
 
-| Service    | Port(s)   | Notes             |
-|------------|-----------|-------------------|
-| Proxy      | 80,443    | HTTP/HTTPS        |
-| Prometheus | 9090      | Metrics           |
-| Grafana    | 3000      | Dashboards        |
-| Cockroach  | 26257–61  | SQL endpoints     |
-| …          | …         | …                 |
+# Monitoring & metrics
+Proxy with storage: 80/443
+Prometheus: 9090
+Grafana: 3000
+Alert-manager: 9093
+Node exporter: 9100
+Nginx proxy exporter: 9101
+Nginx storage exporter: 9102
 
-(see full table in compose file)
+# DB cluster
+CockroachDB: SQL stream = 26256 / UI stream - 8090
+
+# Custom app
+Daemon monitor app: 9200
+
+
 
 ---
 
-## 📂 Structure
+## Structure
 
 - `infra_init.yml` → Ansible playbook  
-- `tasks/docker.yml` → install Docker  
+- `tasks/docker.yml` → install Docker
 - `roles/stack/` → deploy compose project  
-- `project/` → docker-compose.yml + configs  
+- `project/` → docker-compose.yml + configs
 
 ---
 
-## 🧹 Maintenance
+## Data, confs and log folders
+All data folders could be found in /data directory.
 
-- Stop stack:  
-  ```bash
-  ansible-playbook infra_init.yml --tags stack -e "state=absent"
-  ```
-- Check containers: `docker ps`  
-- Logs: `docker compose -f /opt/infra/docker-compose.yml logs -f`
+# Important
+Shared files = project/data/local-storage
+
+Dockerfile image and app scripts = project/monitoring/daemon-monitor
+Custom app log output with tests = project/data/daemon-monitor/current
+
+Configuration files for prometheus, alert-manager and grafana = project/monitoring/*
+Configs for nginx = project/nginx
+
+
+All the things is also possible to check in project/docker-compose.yml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
