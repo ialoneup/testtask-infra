@@ -2,11 +2,11 @@
 
 All the things is also possible to check in project/docker-compose.yml
 
-- **NGINX reverse proxy** and static storage
-- **CockroachDB cluster** (5 nodes + first init job)
-- **Monitoring stack**: Prometheus, Alertmanager, Node Exporter, NGINX Exporters
-- **Grafana dashboards**
-- **Custom daemon-monitor sidecar**
+- NGINX reverse proxy and static storage
+- CockroachDB cluster (5 nodes + first init job)
+- Monitoring stack: Prometheus, Alertmanager, Node Exporter, NGINX Exporters
+- Grafana dashboards
+- Custom daemon-monitor sidecar
 
 ---
 
@@ -42,10 +42,10 @@ Daemon monitor app: 9200
 
 ## Structure
 
-- `infra_init.yml` → Ansible playbook
-- `tasks/docker.yml` → install Docker
-- `roles/stack/` → deploy compose project
-- `project/` → docker-compose.yml + configs
+- infra_init.yml → Ansible playbook
+- tasks/docker.yml → install Docker
+- roles/stack/ → deploy compose project
+- project/ → docker-compose.yml + configs
 
 ---
 
